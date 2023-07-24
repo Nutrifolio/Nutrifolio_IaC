@@ -1,0 +1,125 @@
+- hosts: all
+  become: true
+
+  tasks:
+    - name: Install required system packages
+      apt:
+        pkg:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - python3-setuptools
+        state: latest
+        update_cache: true
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Add Docker GPG apt key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+        state: present
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Install docker-ce
+      apt:
+        name: docker-ce
+        state: latest
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Install Docker and Docker Compose modules for Python
+      pip:
+        name:
+          - docker
+          - docker-compose
+
+    - name: Copy private key from Ansible Control Node machine
+      copy:
+        src: /root/.ssh/tf-digitalocean
+        dest: /root/.ssh/tf-digitalocean
+        mode: 0600
+
+    - name: Add github.com to known hosts
+      shell: ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+    - name: Clone Nutrifolio_API_Deployment GitHub private repository
+      command: git clone -c "core.sshCommand=ssh -i /root/.ssh/tf-digitalocean" git@github.com:Nutrifolio/Nutrifolio_API_Deployment.git ~/Nutrifolio_API_Deployment
+
+    - name: Substitute the DOMAIN_NAME environment variable in the template files
+      shell:
+        cmd: envsubst '${DOMAIN_NAME}' < virtual_host_template > {{ domain_name }}
+        chdir: /root/Nutrifolio_API_Deployment/nginx/sites-available
+      environment:
+        DOMAIN_NAME: "{{ domain_name }}"
+
+    - name: Remove the template file
+      shell:
+        cmd: rm virtual_host_template
+        chdir: /root/Nutrifolio_API_Deployment/nginx/sites-available
+
+    - name: Deploy Docker Compose stack
+      community.docker.docker_compose:
+        project_src: /root/Nutrifolio_API_Deployment
+
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: latest
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Synchronize sites-available directory
+      command: rsync -a /root/Nutrifolio_API_Deployment/nginx/sites-available/ /etc/nginx/sites-available/
+
+    - name: Clear sites-enabled directory
+      command: rm /etc/nginx/sites-enabled/default
+
+    - name: Create symbolic links
+      command: ln -s /etc/nginx/sites-available/{{ domain_name }} /etc/nginx/sites-enabled/
+
+    - name: Install certbot and certbot nginx plugin
+      apt:
+        pkg:
+          - certbot
+          - python3-certbot-nginx
+        state: latest
+        update_cache: true
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Wait until dig output matches host IP address
+      command: dig {{ domain_name }} @8.8.8.8 @8.8.4.4 +short
+      register: dig_output
+      until: dig_output.stdout.strip() == hostvars[inventory_hostname]['ansible_default_ipv4']['address']
+      delay: 15
+      retries: 50
+
+    - name: Issue SSL certificates
+      command: certbot --nginx -n -d {{ domain_name }} -m {{ email_address }} --agree-tos
+
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted

@@ -1,0 +1,48 @@
+- hosts: localhost
+  become: yes
+
+  tasks:
+    - name: Install required system packages
+      apt:
+        pkg:
+          - gnupg
+          - curl
+          - software-properties-common
+        state: latest
+        update_cache: true
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Add HashiCorp GPG apt key
+      apt_key:
+        url: https://apt.releases.hashicorp.com/gpg
+        state: present
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Add HashiCorp repository
+      apt_repository:
+        repo: deb https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main
+        state: present
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Install terraform
+      apt:
+        name: terraform
+        state: present
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Initialize terraform configuration for ./nutrifolio_api_env
+      shell:
+        cmd: terraform init
+        chdir: ./nutrifolio_api_env
