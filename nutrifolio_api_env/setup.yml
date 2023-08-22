@@ -63,16 +63,23 @@
     - name: Clone Nutrifolio_API_Deployment GitHub private repository
       command: git clone -c "core.sshCommand=ssh -i /root/.ssh/tf-digitalocean" git@github.com:Nutrifolio/Nutrifolio_API_Deployment.git ~/Nutrifolio_API_Deployment
 
-    - name: Substitute the DOMAIN_NAME environment variable in the template files
+    - name: Substitute the DOMAIN_NAME environment variable in the api_template file
       shell:
-        cmd: envsubst '${DOMAIN_NAME}' < virtual_host_template > {{ domain_name }}
+        cmd: envsubst '${DOMAIN_NAME}' < api_template > api.{{ domain_name }}
         chdir: /root/Nutrifolio_API_Deployment/nginx/sites-available
       environment:
         DOMAIN_NAME: "{{ domain_name }}"
 
-    - name: Remove the template file
+    - name: Substitute the DOMAIN_NAME environment variable in the pgadmin_template file
       shell:
-        cmd: rm virtual_host_template
+        cmd: envsubst '${DOMAIN_NAME}' < pgadmin_template > pgadmin.{{ domain_name }}
+        chdir: /root/Nutrifolio_API_Deployment/nginx/sites-available
+      environment:
+        DOMAIN_NAME: "{{ domain_name }}"
+
+    - name: Remove the template files
+      shell:
+        cmd: rm api_template && rm pgadmin_template
         chdir: /root/Nutrifolio_API_Deployment/nginx/sites-available
 
     - name: Deploy Docker Compose stack
@@ -94,8 +101,11 @@
     - name: Clear sites-enabled directory
       command: rm /etc/nginx/sites-enabled/default
 
-    - name: Create symbolic links
-      command: ln -s /etc/nginx/sites-available/{{ domain_name }} /etc/nginx/sites-enabled/
+    - name: Create symbolic link for the api
+      command: ln -s /etc/nginx/sites-available/api.{{ domain_name }} /etc/nginx/sites-enabled/
+
+    - name: Create symbolic link for the pgadmin
+      command: ln -s /etc/nginx/sites-available/pgadmin.{{ domain_name }} /etc/nginx/sites-enabled/
 
     - name: Install certbot and certbot nginx plugin
       apt:
@@ -109,15 +119,25 @@
       delay: 10
       retries: 10
 
-    - name: Wait until dig output matches host IP address
-      command: dig {{ domain_name }} @8.8.8.8 @8.8.4.4 +short
+    - name: Wait until api dig output matches host IP address
+      command: dig api.{{ domain_name }} @8.8.8.8 @8.8.4.4 +short
       register: dig_output
       until: dig_output.stdout.strip() == hostvars[inventory_hostname]['ansible_default_ipv4']['address']
       delay: 15
       retries: 50
 
-    - name: Issue SSL certificates
-      command: certbot --nginx -n -d {{ domain_name }} -m {{ email_address }} --agree-tos
+    - name: Wait until pgadmin dig output matches host IP address
+      command: dig pgadmin.{{ domain_name }} @8.8.8.8 @8.8.4.4 +short
+      register: dig_output
+      until: dig_output.stdout.strip() == hostvars[inventory_hostname]['ansible_default_ipv4']['address']
+      delay: 15
+      retries: 50
+
+    - name: Issue SSL certificate for the api
+      command: certbot --nginx -n -d api.{{ domain_name }} -m {{ email_address }} --agree-tos
+
+    - name: Issue SSL certificate for the pgadmin
+      command: certbot --nginx -n -d pgadmin.{{ domain_name }} -m {{ email_address }} --agree-tos
 
     - name: Restart nginx
       service:

@@ -28,10 +28,17 @@ resource "digitalocean_domain" "domain" {
   name = var.domain_name
 }
 
-resource "digitalocean_record" "cname-record-api" {
+resource "digitalocean_record" "a-record-api" {
   domain = var.domain_name
   type   = "A"
   name   = "api"
+  value  = digitalocean_droplet.nutrifolio-api-env.ipv4_address
+}
+
+resource "digitalocean_record" "a-record-pgadmin" {
+  domain = var.domain_name
+  type   = "A"
+  name   = "pgadmin"
   value  = digitalocean_droplet.nutrifolio-api-env.ipv4_address
 }
 
