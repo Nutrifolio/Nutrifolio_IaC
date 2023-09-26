@@ -5,12 +5,13 @@ The purpose of this repository is to provide the necessary Infrastructure as Cod
 ## Prerequisites
 
 - A DigitalOcean Personal Access Token, which can be [created](https://docs.digitalocean.com/reference/api/create-personal-access-token/) via the DigitalOcean control panel.
+- A DigitalOcean Space Keys pair, which can be [created](https://docs.digitalocean.com/products/spaces/how-to/manage-access/) via the DigitalOcean control panel.
 - An SSH key named `nutrifolio-api-env` added to DigitalOcean and GitHub accounts.
 - A personal domain [pointed](https://docs.digitalocean.com/tutorials/dns-registrars/) to DigitalOcean’s nameservers.
 
 ## Ansible Control Node Setup
 
-The Control Node, the machine on which Ansible is installed, is responsible for executing Ansible Playbooks to configure the Ansible Hosts - the target servers that Ansible manages. Unlike other configuration management tools, Ansible is agentless, meaning that it does not require any specialized software to be installed on the Ansible Hosts being managed.
+The Control Node, the machine on which Ansible is installed, is responsible for executing Ansible Playbooks to configure the Ansible Hosts - the target servers that Ansible manages. The suggested OS for the Control Node is `Ubuntu 22.04 x64`.Unlike other configuration management tools, Ansible is agentless, meaning that it does not require any specialized software to be installed on the Ansible Hosts being managed.
 
 ### Installation Guide
 
@@ -24,7 +25,7 @@ The Control Node, the machine on which Ansible is installed, is responsible for 
 
 - #### Install Ansible
 
-  `pip3 install ansible`
+  `pip3 install ansible==7.5.0`
 
 - #### Generate an SSH key pair without a passphrase (change <your_email_address>)
 
@@ -46,29 +47,37 @@ The Control Node, the machine on which Ansible is installed, is responsible for 
 
   `cd ./Nutrifolio_IaC`
 
-- #### Execute Ansible Playbook (change <your_email_address>)
+- #### Execute Ansible Playbook
 
   `ansible-playbook init.yml`
 
-- #### Export Environment Variable (change <your_API_token>)
+- #### Export Environment Variables
 
   `export DIGITALOCEAN_TOKEN=<your_API_token>`
 
+  `export SPACES_ACCESS_KEY_ID=<your_ACCESS_KEY>`
+
+  `export SPACES_SECRET_ACCESS_KEY=<your_SECRET>`
+
 - #### Change Directory
 
-  `cd ./nutrifolio_api_env`
+  `cd ./nutrifolio_api_env/nutrifolio-infrastructure/`
 
 - #### Execute terraform apply (change <your_domain_name>)
 
-  `terraform apply -var="domain_name=<your_domain_name>" --auto-approve`
+  `terraform apply -var="domain-name=<your_domain_name>" --auto-approve`
 
-- #### Get the IPv4 address of the `nutrifolio-api-env` Droplet
+- #### Get the values of the variables required to setup the `nutrifolio-api-env` Droplet
 
-  `cat nutrifolio-api-env-ipv4`
+  `cat variables.output`
 
-- #### Setup the `nutrifolio-api-env` Droplet (change \<nutrifolio-api-env-ipv4\>, <your_domain_name> & <your_email_address>)
+- #### Change Directory
 
-  `ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u root -i '<nutrifolio-api-env-ipv4>,' -e 'domain_name=<your_domain_name>' -e 'email_address=<your_email_address>' -e 'pub_key=/root/.ssh/tf-digitalocean.pub' --private-key /root/.ssh/tf-digitalocean setup.yml`
+  `cd ../`
+
+- #### Setup the `nutrifolio-api-env` Droplet (change \<nutrifolio-api-env-ipv4\>, <your_domain_name>, <your_email_address>, <db_host>, <db_port>, <db_name>, <db_user>, <db_password> & <sb_url>)
+
+  `ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u root -i '<nutrifolio-api-env-ipv4>,' -e 'domain_name=<your_domain_name>' -e 'email_address=<your_email_address>' -e 'db_host=<db_host>' -e 'db_port=<db_port>' -e 'db_name=<db_name>' -e 'db_user=<db_user>' -e 'db_password=<db_password>' -e 'sb_url=<sb_url>' -e 'pub_key=/root/.ssh/tf-digitalocean.pub' --private-key /root/.ssh/tf-digitalocean setup_droplet.yml`
 
 ## Author
 

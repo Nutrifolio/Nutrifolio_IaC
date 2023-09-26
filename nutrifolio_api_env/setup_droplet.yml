@@ -1,0 +1,158 @@
+- hosts: all
+  become: true
+
+  tasks:
+    - name: Install required system packages
+      apt:
+        pkg:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - python3-setuptools
+        state: latest
+        update_cache: true
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Add Docker GPG apt key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+        state: present
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Install docker-ce
+      apt:
+        name: docker-ce
+        state: latest
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Install Docker and Docker Compose modules for Python
+      pip:
+        name:
+          - docker
+          - docker-compose
+
+    - name: Copy private key from Ansible Control Node machine
+      copy:
+        src: /root/.ssh/tf-digitalocean
+        dest: /root/.ssh/tf-digitalocean
+        mode: 0600
+
+    - name: Add github.com to known hosts
+      shell: ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+    - name: Clone Nutrifolio_API_Deployment GitHub private repository
+      command: git clone -c "core.sshCommand=ssh -i /root/.ssh/tf-digitalocean" git@github.com:Nutrifolio/Nutrifolio_API_Deployment.git ~/Nutrifolio_API_Deployment
+
+    - name: Substitute the environment variables in the backend.env file
+      shell:
+        cmd: envsubst '${DOMAIN_NAME},${DATABASE_HOST},${DATABASE_PORT},${DATABASE_NAME},${DATABASE_USER},${DATABASE_PASSWORD},${DO_SPACE_BUCKET_URL}' < backend.env > backend.env.tmp && mv backend.env.tmp backend.env
+        chdir: /root/Nutrifolio_API_Deployment/env
+      environment:
+        DOMAIN_NAME: "{{ domain_name }}"
+        DATABASE_HOST: "{{ db_host }}"
+        DATABASE_PORT: "{{ db_port }}"
+        DATABASE_NAME: "{{ db_name }}"
+        DATABASE_USER: "{{ db_user }}"
+        DATABASE_PASSWORD: "{{ db_password }}"
+        DO_SPACE_BUCKET_URL: "{{ sb_url }}"
+
+    - name: Substitute the DOMAIN_NAME environment variable in the api_template file
+      shell:
+        cmd: envsubst '${DOMAIN_NAME}' < api_template > api.{{ domain_name }}
+        chdir: /root/Nutrifolio_API_Deployment/nginx/sites-available
+      environment:
+        DOMAIN_NAME: "{{ domain_name }}"
+
+    - name: Substitute the DOMAIN_NAME environment variable in the pgadmin_template file
+      shell:
+        cmd: envsubst '${DOMAIN_NAME}' < pgadmin_template > pgadmin.{{ domain_name }}
+        chdir: /root/Nutrifolio_API_Deployment/nginx/sites-available
+      environment:
+        DOMAIN_NAME: "{{ domain_name }}"
+
+    - name: Remove the template files
+      shell:
+        cmd: rm api_template && rm pgadmin_template
+        chdir: /root/Nutrifolio_API_Deployment/nginx/sites-available
+
+    - name: Deploy Docker Compose stack
+      community.docker.docker_compose:
+        project_src: /root/Nutrifolio_API_Deployment
+
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: latest
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Synchronize sites-available directory
+      command: rsync -a /root/Nutrifolio_API_Deployment/nginx/sites-available/ /etc/nginx/sites-available/
+
+    - name: Clear sites-enabled directory
+      command: rm /etc/nginx/sites-enabled/default
+
+    - name: Create symbolic link for the api
+      command: ln -s /etc/nginx/sites-available/api.{{ domain_name }} /etc/nginx/sites-enabled/
+
+    - name: Create symbolic link for the pgadmin
+      command: ln -s /etc/nginx/sites-available/pgadmin.{{ domain_name }} /etc/nginx/sites-enabled/
+
+    - name: Install certbot and certbot nginx plugin
+      apt:
+        pkg:
+          - certbot
+          - python3-certbot-nginx
+        state: latest
+        update_cache: true
+      register: status
+      until: status is success
+      delay: 10
+      retries: 10
+
+    - name: Wait until api dig output matches host IP address
+      command: dig api.{{ domain_name }} @8.8.8.8 @8.8.4.4 +short
+      register: dig_output
+      until: dig_output.stdout.strip() == hostvars[inventory_hostname]['ansible_default_ipv4']['address']
+      delay: 15
+      retries: 50
+
+    - name: Wait until pgadmin dig output matches host IP address
+      command: dig pgadmin.{{ domain_name }} @8.8.8.8 @8.8.4.4 +short
+      register: dig_output
+      until: dig_output.stdout.strip() == hostvars[inventory_hostname]['ansible_default_ipv4']['address']
+      delay: 15
+      retries: 50
+
+    - name: Issue SSL certificate for the api
+      command: certbot --nginx -n -d api.{{ domain_name }} -m {{ email_address }} --agree-tos
+
+    - name: Issue SSL certificate for the pgadmin
+      command: certbot --nginx -n -d pgadmin.{{ domain_name }} -m {{ email_address }} --agree-tos
+
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted

@@ -45,4 +45,4 @@
     - name: Initialize terraform configuration for ./nutrifolio_api_env
       shell:
         cmd: terraform init
-        chdir: ./nutrifolio_api_env
+        chdir: ./nutrifolio_api_env/nutrifolio-infrastructure
