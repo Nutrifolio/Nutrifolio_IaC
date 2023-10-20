@@ -63,9 +63,18 @@ The Control Node, the machine on which Ansible is installed, is responsible for 
 
   `cd ./nutrifolio_api_env/nutrifolio-infrastructure/`
 
-- #### Execute terraform apply (change <your_domain_name>)
+- #### Execute terraform apply (change <your_domain_name>, <your_digitalocean_ssh_key_name>, <Development or Production>, <your_vpc_name>, <your_space_bucket_name>, <your_db_cluster_name>)
 
-  `terraform apply -var="domain-name=<your_domain_name>" --auto-approve`
+<pre>
+  terraform apply \
+    -var="domain-name=&lt;your_domain_name&gt;" \
+    -var="ssh-key-name=&lt;your_digitalocean_ssh_key_name&gt;" \
+    -var="environment=&lt;Development or Production&gt;" \
+    -var="vpc-name=&lt;your_vpc_name&gt;" \
+    -var="sb-name=&lt;your_space_bucket_name&gt;" \
+    -var="db-cluster-name=&lt;your_db_cluster_name&gt;" \
+    --auto-approve
+</pre>
 
 - #### Get the values of the variables required to setup the `nutrifolio-api-env` Droplet
 
@@ -75,9 +84,30 @@ The Control Node, the machine on which Ansible is installed, is responsible for 
 
   `cd ../`
 
-- #### Setup the `nutrifolio-api-env` Droplet (change \<nutrifolio-api-env-ipv4\>, <your_domain_name>, <your_email_address>, <db_host>, <db_port>, <db_name>, <db_user>, <db_password> & <sb_url>)
+- #### Setup the `nutrifolio-api-env` Droplet (change \<nutrifolio-api-env-ipv4\>, <your_domain_name>, <your_email_address>, <db_host>, <db_port>, <db_name>, <db_user>, <db_password>, <secret_key>, <do_access_key>, <do_secret_key>, <sb_url>, <dsn>, <pgadmin_email> & <pgadmin_password>)
 
-  `ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u root -i '<nutrifolio-api-env-ipv4>,' -e 'domain_name=<your_domain_name>' -e 'email_address=<your_email_address>' -e 'db_host=<db_host>' -e 'db_port=<db_port>' -e 'db_name=<db_name>' -e 'db_user=<db_user>' -e 'db_password=<db_password>' -e 'sb_url=<sb_url>' -e 'pub_key=/root/.ssh/tf-digitalocean.pub' --private-key /root/.ssh/tf-digitalocean setup_droplet.yml`
+<pre>
+  ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook \
+    -u root \
+    -i '&lt;nutrifolio-api-env-ipv4&gt;,' \
+    -e 'domain_name=&lt;your_domain_name&gt;' \
+    -e 'email_address=&lt;your_email_address&gt;' \
+    -e 'db_host=&lt;db_host&gt;' \
+    -e 'db_port=&lt;db_port&gt;' \
+    -e 'db_name=&lt;db_name&gt;' \
+    -e 'db_user=&lt;db_user&gt;' \
+    -e 'db_password=&lt;db_password&gt;' \
+    -e 'secret_key=&lt;secret_key&gt;' \
+    -e 'do_access_key=&lt;do_access_key&gt;' \
+    -e 'do_secret_key=&lt;do_secret_key&gt;' \
+    -e 'sb_url=&lt;sb_url&gt;' \
+    -e 'dsn=&lt;dsn&gt;' \
+    -e 'pgadmin_email=&lt;pgadmin_email&gt;' \
+    -e 'pgadmin_password=&lt;pgadmin_password&gt;' \
+    -e 'pub_key=/root/.ssh/tf-digitalocean.pub' \
+    --private-key /root/.ssh/tf-digitalocean \
+    setup_droplet.yml
+</pre>
 
 ## Author
 

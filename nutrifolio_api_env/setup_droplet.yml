@@ -65,7 +65,7 @@
 
     - name: Substitute the environment variables in the backend.env file
       shell:
-        cmd: envsubst '${DOMAIN_NAME},${DATABASE_HOST},${DATABASE_PORT},${DATABASE_NAME},${DATABASE_USER},${DATABASE_PASSWORD},${DO_SPACE_BUCKET_URL}' < backend.env > backend.env.tmp && mv backend.env.tmp backend.env
+        cmd: envsubst '${DOMAIN_NAME},${DATABASE_HOST},${DATABASE_PORT},${DATABASE_NAME},${DATABASE_USER},${DATABASE_PASSWORD},${SECRET_KEY},${DO_ACCESS_KEY},${DO_SECRET_KEY},${DO_SPACE_BUCKET_URL},${DSN}' < backend.env > backend.env.tmp && mv backend.env.tmp backend.env
         chdir: /root/Nutrifolio_API_Deployment/env
       environment:
         DOMAIN_NAME: "{{ domain_name }}"
@@ -74,7 +74,19 @@
         DATABASE_NAME: "{{ db_name }}"
         DATABASE_USER: "{{ db_user }}"
         DATABASE_PASSWORD: "{{ db_password }}"
+        SECRET_KEY: "{{ secret_key }}"
+        DO_ACCESS_KEY: "{{ do_access_key }}"
+        DO_SECRET_KEY: "{{ do_secret_key }}"
         DO_SPACE_BUCKET_URL: "{{ sb_url }}"
+        DSN: "{{ dsn }}"
+
+    - name: Substitute the environment variables in the pgadmin.env file
+      shell:
+        cmd: envsubst '${PGADMIN_DEFAULT_EMAIL},${PGADMIN_DEFAULT_PASSWORD}' < pgadmin.env > pgadmin.env.tmp && mv pgadmin.env.tmp pgadmin.env
+        chdir: /root/Nutrifolio_API_Deployment/env
+      environment:
+        PGADMIN_DEFAULT_EMAIL: "{{ pgadmin_email }}"
+        PGADMIN_DEFAULT_PASSWORD: "{{ pgadmin_password }}"
 
     - name: Substitute the DOMAIN_NAME environment variable in the api_template file
       shell:
